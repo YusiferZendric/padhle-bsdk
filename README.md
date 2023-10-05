@@ -1,45 +1,61 @@
-# Reddit Goal Management Bot
+# u/padhle-bsdkk
 
-This bot is designed to help Reddit users manage their study goals on the `jeeneetards` subreddit. The bot provides several functionalities, including setting goals, updating them, viewing progress, adding new goals, removing existing goals, and displaying the time remaining for major events.
+A Reddit bot designed to help users manage their study goals.
 
-## Features:
+## Overview
 
-1. **Set Goals**: Users can define and set their study goals.
-2. **Update Goals**: Users can update their progress on the goals they've set.
-3. **View Goals**: Users can view their goals and the progress they've made.
-4. **Add Goals**: Users can add more tasks to their existing goals.
-5. **Remove Goals**: Users can remove specific tasks from their existing goals.
-6. **Time Remaining**: The bot can display the time remaining for major events like JEE and NEET exams.
+The bot listens to specific commands mentioned in the comments on the subreddit 'jeeneetards'. It allows users to set, view, update, add, and remove their study goals. Additionally, the bot can display the time remaining for certain key events and provide motivational quotes to the users.
 
-## Dependencies:
+## Commands
 
-- `praw`: Reddit API wrapper for Python.
-- `random`: For random operations.
-- `os`: For OS-level operations.
-- `datetime`: To handle date and time operations.
-- `PIL (Pillow)`: For image processing tasks.
-- `imgurpython`: To upload images to Imgur.
-- `textwrap`: For text formatting.
-- `re`: Regular expression operations.
-- `sqlite3`: For database operations.
-- `json`: For encoding and decoding JSON formatted data.
+1. **Set Goal**:
+    - Command: `u/padhle-bsdkk setgoal "TASK_DESCRIPTION [PERCENTAGE%]: ... : x hours"`
+    - Sets a series of tasks and their completion targets for the user.
+    - Example: 
+    ```
+    u/padhle-bsdkk setgoal "Complete Quantum Mechanics Chapter [30%]: Solve Thermodynamics PYQs [50%]: Watch Organic Chemistry Lectures [20%]: 8 hours"
+    ```
 
-## How it works:
+2. **Update Goal**:
+    - Command: `u/padhle-bsdkk updategoal TASK_NO. PERCENTAGE% ...`
+    - Updates the progress of the tasks.
+    - Example: 
+    ```
+    u/padhle-bsdkk updategoal 1. 15% 2. 25% 3. 10%
+    ```
 
-The bot continuously monitors the `jeeneetards` subreddit for new comments. When it finds a comment with a specific command (like `u/padhle-bsdkk setgoal`), it processes the command and replies to the user's comment with the appropriate response.
+3. **View Goal**:
+    - Command: `u/padhle-bsdkk viewgoal`
+    - Displays the user's current goals and their progress.
 
-## Setup:
+4. **Add Goal**:
+    - Command: `u/padhle-bsdkk addgoal "TASK_DESCRIPTION: x hours"`
+    - Adds a new task to the user's existing goals.
+    - Example: 
+    ```
+    u/padhle-bsdkk addgoal "Modern Physics PYQ from Marks: 0.5 hours"
+    ```
 
-1. Make sure you have all the required dependencies installed.
-2. Set up the SQLite database by running the `setup_database` method.
-3. Start the bot by executing the script.
+5. **Remove Goal**:
+    - Command: `u/padhle-bsdkk removegoal TASK_NO`
+    - Removes a specific task from the user's goals based on the task number.
+    - Example: 
+    ```
+    u/padhle-bsdkk removegoal 2
+    ```
 
-## Notes:
+6. **Display Time Remaining**:
+    - Command: `u/padhle-bsdkk time`
+    - Displays the time left for certain key events (like exams) with a motivational quote.
 
-- Ensure that you have set the correct API keys and credentials for both Reddit and Imgur.
-- The bot uses SQLite to manage and store user goals and progress.
-- It's recommended to run the bot continuously for real-time responses.
+## Features
 
-## Disclaimer:
+- Uses the `praw` library to interact with Reddit.
+- Uses the `sqlite3` library to manage user data in a local database.
+- Uses the `imgurpython` library to upload images to Imgur.
+- Uses the `PIL` library to generate images.
+- Provides random motivational quotes to users.
 
-Please keep your API keys and credentials secure. The ones provided in the code are placeholders and should be replaced with your own.
+## Usage
+
+Simply run the script, and the bot will start listening to the commands on the specified subreddit. Ensure all necessary dependencies are installed and the SQLite database is set up.
