@@ -10,13 +10,13 @@ import sqlite3
 import json
 class RedditBot:
     def __init__(self):
-        self.client_id = 'a6e933249c93935'
-        self.client_secret = '772422fda828191fc3d09ffb141196b5a607f5cc'
+        self.client_id = 'client_id'
+        self.client_secret = 'client_secret'
         self.client = ImgurClient(self.client_id, self.client_secret)
-        self.reddit = praw.Reddit(client_id="zzdyeGoux-tEgGejZHER5g",
-                                  client_secret="wQSY0-54Gf0WbykN21bOb499_Itatg",
+        self.reddit = praw.Reddit(client_id="client_id",
+                                  client_secret="client_secret",
                                   username="padhle-bsdkk",
-                                  password="P298ypcrq",
+                                  password="password",
                                   user_agent="padhle-bsdkk bot by u/zendrixate")
         self.subreddit = self.reddit.subreddit('jeeneetards')
         self.processed_comments = set()
