@@ -1,4 +1,4 @@
-# u/padhle-bsdkk
+# [u/padhle-bsdkk](https://www.reddit.com/user/padhle-bsdkk/)
 
 A Reddit bot designed to help users manage their study goals.
 
