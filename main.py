@@ -10,17 +10,73 @@ import sqlite3
 import json
 class RedditBot:
     def __init__(self):
-        self.client_id = 'client_id'
-        self.client_secret = 'client_secret'
+        self.client_id = 'a6e933249c93935'
+        self.client_secret = '772422fda828191fc3d09ffb141196b5a607f5cc'
         self.client = ImgurClient(self.client_id, self.client_secret)
-        self.reddit = praw.Reddit(client_id="client_id",
-                                  client_secret="client_secret",
+        self.reddit = praw.Reddit(client_id="zzdyeGoux-tEgGejZHER5g",
+                                  client_secret="wQSY0-54Gf0WbykN21bOb499_Itatg",
                                   username="padhle-bsdkk",
-                                  password="password",
+                                  password="P298ypcrq",
                                   user_agent="padhle-bsdkk bot by u/zendrixate")
         self.subreddit = self.reddit.subreddit('jeeneetards')
         self.processed_comments = set()
         self.setup_database()
+    def simulate(self):
+        print("Simulation mode...")
+
+        # Dummy comments for simulation
+        dummy_comments = [
+            {"body": 'u/padhle-bsdkk updategoal 1. 100%', "author": "zendrixate", "id": "test1"},
+            # {"body": "u/padhle-bsdkk stats ...", "author": "zendrixate", "id": "test2"}, # adjust as necessary
+            # {"body": "u/padhle-bsdkk stats ...", "author": "zendrixate", "id": "test2"}, # adjust as necessary
+            # ... Add more dummy comments here
+        ]
+
+        for comment in dummy_comments:
+            try:
+                author = comment['author']
+            except AttributeError:
+                continue
+
+            print(f"New simulated message from {author}...")
+
+            if "u/padhle-bsdkk time" in comment['body'].lower() and author != 'padhle-bsdkk':
+                # Instead of replying to the comment, print the response.
+                print("[Reply]:", self.days_hours_minutes_remaining(datetime(2024, 1, 24), 'Mains 2024'))
+
+            if "u/padhle-bsdkk setgoal" in comment['body'].lower() and author != 'padhle-bsdkk':
+                response = self.set_goal(author, comment['body'])
+                print("[Reply]:", response)
+
+            if "u/padhle-bsdkk updategoal" in comment['body'].lower() and author != 'padhle-bsdkk':
+                response = self.update_goal(author, comment['body'])
+                print("[Reply]:", response)
+
+            if "u/padhle-bsdkk viewgoal" in comment['body'].lower() and author != 'padhle-bsdkk':
+                response = self.view_goal(author)
+                print("[Reply]:", response)
+
+            if "u/padhle-bsdkk addgoal" in comment['body'].lower() and author != 'padhle-bsdkk':
+                response = self.add_goal(author, comment['body'])
+                print("[Reply]:", response)
+
+            if "u/padhle-bsdkk removegoal" in comment['body'].lower() and author != 'padhle-bsdkk':
+                response = self.remove_goal(author, comment['body'])
+                print("[Reply]:", response)
+
+            if "u/padhle-bsdkk stats" in comment['body'].lower() and author != 'padhle-bsdkk':
+                response = self.display_stats(author)
+                print("[Reply]:", response)
+
+    def is_valid_command_url(self, comment, command):
+        valid_url = "https://www.reddit.com/r/JEENEETards/comments/16ccs0r/so_ive_created_a_bot_out_of_boredom_padhlebsdk/?rdt=45360"
+        
+        # If it's a 'time' command, it can be from anywhere in the subreddit
+        if command == "time":
+            return comment.subreddit.display_name.lower() == "jeeneetards"
+        
+        # For other commands, it should be from the specific post
+        return comment.permalink.startswith(valid_url)
     def setup_database(self):
         self.conn = sqlite3.connect('user_goals.db')
         self.cursor = self.conn.cursor()
@@ -44,6 +100,16 @@ class RedditBot:
                 FOREIGN KEY (username) REFERENCES goals(username)
             )
         ''')
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS stats (
+            username TEXT PRIMARY KEY,
+            challenges_taken INTEGER DEFAULT 0,
+            challanges_finished INTEGER DEFAULT 0,
+            streak INTEGER DEFAULT 0,
+            hours_studied REAL DEFAULT 0.0
+        )
+        ''')
+        self.conn.commit()
         
         # Check if the timestamp column exists and add if it doesn't
         self.cursor.execute("PRAGMA table_info(goals)")
@@ -104,9 +170,22 @@ class RedditBot:
         for task in tasks[:-1]:
             task_description, percentage_str = task.rsplit('[', 1)
             target_percentage = int(percentage_str.split('%')[0])
-            totalPercentage.append(target_percentage)
+            # Extract the tasks and the target_time_str
+            tasks, target_time_str = goal_data_str.rsplit(":", 1)
+            tasks = tasks.split(":")
+            tasks.append(target_time_str.split()[-2])  # Append the task before the target_time_str
+
+            # Other processing for target_time remains unchanged...
+
+            # Storing individual tasks and their target percentages
+            totalPercentage = []
+            for task in tasks[:-1]:  # Now it correctly includes all tasks
+                task_description, percentage_str = task.rsplit('[', 1)
+                target_percentage = int(percentage_str.split('%')[0])
+                totalPercentage.append(target_percentage)
+
         if sum(totalPercentage) != 100:
-            return """*Total percentage of all Tasks should be 100. Eg: 30 50 20*. 
+            return f"""*Current Percentage: {totalPercentage}\nTotal percentage of all Tasks should be 100. Eg: 30 50 20*. 
                 **Dummy Example**: 
                 ```
                 u/padhle-bsdkk setgoal "Complete Quantum Mechanics Chapter [30%]: Solve Thermodynamics PYQs [50%]: Watch Organic Chemistry Lectures [20%]: 8 hours"
@@ -123,13 +202,25 @@ class RedditBot:
                 ''', (author, task_description.strip(), target_percentage))
         
         self.conn.commit()
-        return f"Goal set for {author}. I'll remind you in {target_time_str} hours!"
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO stats (username, challenges_taken)
+            VALUES (?, 0)
+        ''', (author,))
+        self.cursor.execute('''
+            UPDATE stats
+            SET challenges_taken = challenges_taken + 1
+            WHERE username = ?
+        ''', (author,))
+
+        self.conn.commit()
+        return f"Goal set for {author}. I'll remind you in {target_time_str.strip()}!"
 
     def give_random_quote(self):
         with open("quotes.txt", 'r') as file:
             return random.choice(file.readlines()).strip()
     def update_goal(self, author, command_text):
         # Extracting task updates
+        hours_studied = 0
         updates = re.findall(r'(\d+)\.\s*(\d+)%', command_text)
         if not updates:
             return """*Invalid Update Format*
@@ -147,10 +238,11 @@ class RedditBot:
                 percentage = int(percentage)
             except ValueError:
                 continue
-        
-            # Fetch the task description based on the task number
+
+            # Fetch the task description and target_percentage based on the task number
             self.cursor.execute('''
-                SELECT task_description FROM progress
+                SELECT task_description, target_percentage, current_percentage
+                FROM progress
                 WHERE username = ?
                 ORDER BY task_description ASC
                 LIMIT 1 OFFSET ?
@@ -158,14 +250,22 @@ class RedditBot:
             result = self.cursor.fetchone()
             if not result:
                 continue
-            task_description = result[0]
+            task_description, task_target_percentage,current_percentage = result
+            percentage = percentage-current_percentage 
+            # Calculate the effective progress
+            effective_progress = (percentage / 100) * task_target_percentage
 
-            # Update the current percentage for the task
+            # Update the current percentage for the task with the effective progress
             self.cursor.execute('''
                 UPDATE progress
                 SET current_percentage = ?
                 WHERE username = ? AND task_description = ?
-            ''', (percentage, author, task_description))
+            ''', (effective_progress, author, task_description))
+            self.cursor.execute('''SELECT target_time FROM goals WHERE username = ?''', (author,))
+            total_time = self.cursor.fetchone()
+            if total_time:
+                total_time = total_time[0]
+                hours_studied += (effective_progress / 100) * (total_time / 3600)  # Convert total_time from seconds to hours
 
         self.conn.commit()
 
@@ -174,7 +274,10 @@ class RedditBot:
             FROM progress
             WHERE username = ?
         ''', (author,))
+        
+
         results = self.cursor.fetchall()
+        print(results)
         if not results:
             return "No goals found for the user."
 
@@ -182,27 +285,43 @@ class RedditBot:
         total_progress = 0
         total_target = 0
         for current, target in results:
-            progress_percentage = (current / 100) * target
-            total_progress += progress_percentage
+            progress_messages.append(f"{current:.2f}/{target}")
+            total_progress += current
             total_target += target
-            progress_messages.append(f"{progress_percentage:.2f}/{target}")
 
         overall_percentage = (total_progress / total_target) * 100
         progress_summary = ", ".join(progress_messages)
-        for task_num, percentage in updates:
+        self.cursor.execute('''
+            UPDATE stats
+            SET hours_studied = hours_studied + ?
+            WHERE username = ?
+        ''', (hours_studied, author))
+        self.cursor.execute('''
+            SELECT hours_studied
+            FROM stats
+            WHERE username = ?
+        ''', (author,))
+        self.conn.commit()
+        if round(overall_percentage) == 100:
+            # Display congratulatory message
+            response = "Congrats! You have finished your challenge."
+            
+            # Increment the challanges_finished by 1
             self.cursor.execute('''
-                SELECT target_percentage
-                FROM progress
-                WHERE username = ? AND task_description = ?
-            ''', (author, task_description))
-            target_percentage = self.cursor.fetchone()[0]
-            remaining_percentage = int(target_percentage) - (int(percentage) / 100) * int(target_percentage)
-            self.cursor.execute('''
-                UPDATE progress
-                SET current_percentage = ?, task_description = REPLACE(task_description, ? || '%]', ? || '%]')
-                WHERE username = ? AND task_description LIKE ?
-            ''', (percentage, target_percentage, remaining_percentage, author, task_description.split('[')[0] + '%'))
-        return f"Updated your goals, {author}. Your progress: {progress_summary}. Overall: {overall_percentage:.2f}% of your total goals!"
+                UPDATE stats
+                SET challanges_finished = challanges_finished + 1
+                WHERE username = ?
+            ''', (author,))
+
+            # Remove the user's data from goals and progress tables
+            self.cursor.execute('DELETE FROM goals WHERE username = ?', (author,))
+            self.cursor.execute('DELETE FROM progress WHERE username = ?', (author,))
+        else:
+            response = f"Updated your goals, {author}. Your progress: {progress_summary}. Overall: {overall_percentage:.2f}% of your total goals!"
+    
+        self.conn.commit()
+        return response
+
     def view_goal(self, author):
         self.cursor.execute('''
             SELECT task_description, target_percentage, current_percentage
@@ -235,9 +354,11 @@ class RedditBot:
         ''', (author,))
         goal_timestamp = self.cursor.fetchone()[0]
         goal_datetime = datetime.strptime(goal_timestamp, '%Y-%m-%d %H:%M:%S')
-        elapsed_time = (current_time - goal_datetime).seconds / 3600
+        difference = current_time - goal_datetime
+        elapsed_time = (difference.days * 24) + (difference.seconds / 3600)
 
         print("Most Recent Goal Timestamp:", goal_timestamp)
+        print("Current Timestamp:", current_time)
         print("Calculated Elapsed Time:", elapsed_time)
         # Create a table-like structure for the goals
         
@@ -258,14 +379,41 @@ class RedditBot:
             table += f"| {idx} | {desc} | {target}% | {current}% |\n"
         totalidx = int(get_larger_root(1, 1, -2 * totalidx))
         table += f"| Total | Duration: {elapsed_time:.2f}/{target_time:.2f} hours | 100% | {totalcurrent}% |\n"
+        if elapsed_time > target_time:
+            # Remove the goal from goals and progress tables
+            self.cursor.execute('DELETE FROM goals WHERE username = ?', (author,))
+            self.cursor.execute('DELETE FROM progress WHERE username = ?', (author,))
+            
+            # Update the stats table
+            self.cursor.execute('SELECT challenges_taken FROM stats WHERE username = ?', (author,))
+            challenges = self.cursor.fetchone()
+            if challenges:
+                challenges_taken = challenges[0] + 1
+                self.cursor.execute('UPDATE stats SET challenges_taken = ? WHERE username = ?', (challenges_taken, author))
+            else:
+                self.cursor.execute('INSERT INTO stats (username, challenges_taken) VALUES (?, 1)', (author,))
+
+            # For hours_studied, using ratio of target overall percentage completed out of allotted time
+            total_percentage_completed = totalcurrent
+            hours_studied = (total_percentage_completed / 100) * target_time / 3600
+            
+            self.cursor.execute('UPDATE stats SET hours_studied = hours_studied + ? WHERE username = ?', (hours_studied, author))
+            self.conn.commit()
+            return f"""{table}\n
+            You forgot to update the task. This table will be removed from the database now.
+            See your current stats using 'u/padhle-bsdkk stats'
+            """
         return table
 
     def add_goal(self, author, command_text):
         # Extracting goal data
         goal_data_match = re.search(r'"(.*?)"', command_text)
         texttemp = ""
+        self.cursor.execute('''SELECT task_description, current_percentage FROM progress WHERE username = ?''', (author,))
+        current_percentages = dict(self.cursor.fetchall())
+
         if "%" in command_text:
-            texttemp+='Avoid using %'
+            texttemp += 'Avoid using %'
         if not goal_data_match or "%" in command_text:
             return f"""*Invalid goal format. {texttemp}*
             **Dummy Example**: 
@@ -301,14 +449,19 @@ class RedditBot:
         existing_goal_data, existing_target_time = existing_goals
         tasks = json.loads(existing_goal_data)
         total_time = existing_target_time + additional_time
-        new_percentage = round((additional_time/total_time)*100,2)
+
+        # Check if task already exists
+        if any(task_description.strip() in task for task in tasks):
+            return f"Task '{task_description.strip()}' already exists for {author}."
+
+        new_percentage = round((additional_time / total_time) * 100, 2)
         tasks.append(f"{task_description.strip()} [{new_percentage}%]")
 
         # Adjust percentages for existing tasks
         for idx, task in enumerate(tasks[:-1]):
             task_desc, percentage_str = task.rsplit('[', 1)
             old_percentage = float(percentage_str.split('%')[0])
-            new_task_percentage = round((round((old_percentage/100)* existing_target_time,2)/(total_time))*100,2)
+            new_task_percentage = round((round((old_percentage / 100) * existing_target_time, 2) / (total_time)) * 100, 2)
             tasks[idx] = f"{task_desc.strip()} [{new_task_percentage}%]"
 
         # Update the goals in the database
@@ -317,15 +470,19 @@ class RedditBot:
             SET goal_data = ?, target_time = ?
             WHERE username = ?
         ''', (json.dumps(tasks), total_time, author))
+
         for task in tasks:
             task_desc, percentage_str = task.rsplit('[', 1)
             target_percentage = float(percentage_str.split('%')[0])
-            self.cursor.execute('''
-                INSERT OR REPLACE INTO progress (username, task_description, target_percentage, current_percentage)
-                VALUES (?, ?, ?, 0)
-            ''', (author, task_desc.strip(), target_percentage))
-        self.conn.commit()
+            current_percentage = current_percentages.get(task_desc.strip(), 0)  # Use the stored current percentage if it exists
+            self.cursor.execute('''INSERT OR REPLACE INTO progress (username, task_description, target_percentage, current_percentage)
+                                    VALUES (?, ?, ?, ?)''', (author, task_desc.strip(), target_percentage, current_percentage))
+        
+        self.conn.commit()  # Commit changes to the database
+
         return f"Added new goal for {author}. Total time is now {total_time / 3600} hours!"
+
+
     def days_hours_minutes_remaining(self, target_date, event_name):
         current_date = datetime.now()
         difference = target_date - current_date
@@ -428,47 +585,48 @@ class RedditBot:
             ```
             **Syntax**: removegoal <task number>
             """
-        
+
         task_num = int(task_num_match.group(1))
 
-        # Fetch existing goals and time
-        self.cursor.execute('''
-            SELECT goal_data, target_time
-            FROM goals
-            WHERE username = ?
-        ''', (author,))
+        # Fetch existing goals
+        self.cursor.execute('''SELECT goal_data, target_time FROM goals WHERE username = ?''', (author,))
         existing_goals = self.cursor.fetchone()
         if not existing_goals:
             return "No existing goals found for the user."
 
-        existing_goal_data, existing_target_time = existing_goals
+        existing_goal_data,current_total_time = existing_goals
         tasks = json.loads(existing_goal_data)
+
         if task_num > len(tasks) or task_num < 1:
             return "Invalid task number. Please provide a valid task number to remove."
 
-        # Extract the percentage of the task to be removed
+        # Remove the task
+        print(tasks)
         removed_task = tasks.pop(task_num - 1)
         _, removed_percentage_str = removed_task.rsplit('[', 1)
         removed_percentage = float(removed_percentage_str.split('%')[0])
+        time_to_be_removed = (removed_percentage / 100) * current_total_time
 
-        # Calculate time to be reduced
-        time_per_percentage = existing_target_time / 100
-        reduced_time = removed_percentage * time_per_percentage
-        total_time = existing_target_time - reduced_time
+        # Adjust the total time
+        new_total_time = current_total_time - time_to_be_removed
+        # Calculate the total percentage of remaining tasks before adjustment
+        total_percentage_before = sum(float(task.rsplit('[', 1)[1].split('%')[0]) for task in tasks)
 
-        # Adjust percentages for remaining tasks
+        # Adjust the percentages of the remaining tasks
         for idx, task in enumerate(tasks):
             task_desc, percentage_str = task.rsplit('[', 1)
             old_percentage = float(percentage_str.split('%')[0])
-            new_task_percentage = round((time_per_percentage * old_percentage) / total_time, 2)*100
-            tasks[idx] = f"{task_desc.strip()} [{new_task_percentage}%]"
+            # The adjustment is proportional to each task's previous percentage
+            adjustment = (old_percentage / total_percentage_before) * removed_percentage
+            new_percentage = old_percentage + adjustment
+            tasks[idx] = f"{task_desc.strip()} [{new_percentage:.2f}%]"
 
         # Update the goals in the database
         self.cursor.execute('''
             UPDATE goals
             SET goal_data = ?, target_time = ?
             WHERE username = ?
-        ''', (json.dumps(tasks), total_time, author))
+        ''', (json.dumps(tasks), new_total_time, author))
 
         for task in tasks:
             task_desc, percentage_str = task.rsplit('[', 1)
@@ -486,8 +644,27 @@ class RedditBot:
         ''', (author, task_desc.strip()))
 
         self.conn.commit()
-        return f"Removed goal {task_num} for {author}. Total time is now {total_time / 3600} hours!"
+        return f"Removed goal {task_num} for {author}!"
 
+
+
+    def display_stats(self, author):
+        self.cursor.execute('''
+            SELECT challenges_taken, streak, hours_studied
+            FROM stats
+            WHERE username = ?
+        ''', (author,))
+        stats_data = self.cursor.fetchone()
+        
+        if not stats_data:
+            return f"No stats data found for {author}."
+
+        challenges_taken, streak, hours_studied = stats_data
+
+        return (f"**Stats for {author}**:\n\n"
+                f"- Challenges taken: {challenges_taken}\n"
+                f"- Current streak: {streak} days\n"
+                f"- Total hours studied: {hours_studied:.2f} hours")
     def run(self):
         print("Checking for new messages...")
         while True:
@@ -501,24 +678,33 @@ class RedditBot:
                     continue
 
                 print(f"New message from {author}...")
-                if "u/padhle-bsdkk time" in comment.body.lower() and author != 'padhle-bsdkk':
+                if "u/padhle-bsdkk time" in comment.body.lower() and author != 'padhle-bsdkk' and self.is_valid_command_url(comment, "time"):
                     self.display_time_remaining(comment, author)
-                if "u/padhle-bsdkk setgoal" in comment.body.lower() and author != 'padhle-bsdkk':
+                if "u/padhle-bsdkk setgoal" in comment.body.lower() and author != 'padhle-bsdkk' and self.is_valid_command_url(comment, "setgoal"):
                     response = self.set_goal(author, comment.body)
                     comment.reply(response)
-                if "u/padhle-bsdkk updategoal" in comment.body.lower() and author != 'padhle-bsdkk':
+                if "u/padhle-bsdkk updategoal" in comment.body.lower() and author != 'padhle-bsdkk' and self.is_valid_command_url(comment, "updategoal"):
                     response = self.update_goal(author, comment.body)
                     comment.reply(response)
-                if "u/padhle-bsdkk viewgoal" in comment.body.lower() and author != 'padhle-bsdkk':
+                if "u/padhle-bsdkk viewgoal" in comment.body.lower() and author != 'padhle-bsdkk' and self.is_valid_command_url(comment, "viewgoal"):
                     response = self.view_goal(author)
                     comment.reply(response)
-                if "u/padhle-bsdkk addgoal" in comment.body.lower() and author != 'padhle-bsdkk':
+                if "u/padhle-bsdkk addgoal" in comment.body.lower() and author != 'padhle-bsdkk' and self.is_valid_command_url(comment, "addgoal"):
                     response = self.add_goal(author, comment.body)
                     comment.reply(response)
-                if "u/padhle-bsdkk removegoal" in comment.body.lower() and author != 'padhle-bsdkk':
+                if "u/padhle-bsdkk removegoal" in comment.body.lower() and author != 'padhle-bsdkk' and self.is_valid_command_url(comment, "removegoal"):
                     response = self.remove_goal(author, comment.body)
                     comment.reply(response)
+                if "u/padhle-bsdkk stats" in comment.body.lower() and author!='padhle-bsdkk' and self.is_valid_command_url(comment, 'stats'):
+                    response = self.display_stats(author)
+                    comment.reply(response)
+
 
 if __name__ == "__main__":
     bot = RedditBot()
-    bot.run()
+    # mode = input("Enter 'simulate' to run in simulation mode or 'run' to run normally: ")
+    mode = 'simulate'
+    if mode == "simulate":
+        bot.simulate()
+    else:
+        bot.run()
